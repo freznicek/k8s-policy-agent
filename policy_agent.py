@@ -9,11 +9,9 @@ from threading import Thread
 import requests
 
 import pycalico
-from pycalico.datastore_datatypes import Rules, Rule, GlobalPolicy
-from pycalico.datastore_errors import (ProfileNotInEndpoint, 
-                                       ProfileAlreadyInEndpoint,
-                                       MultipleEndpointsMatch)
-from pycalico.datastore import DatastoreClient
+#from pycalico.datastore_datatypes import Rules, Rule, GlobalPolicy
+#from pycalico.datastore_errors import (ProfileNotInEndpoint, ProfileAlreadyInEndpoint, MultipleEndpointsMatch)
+#from pycalico.datastore import DatastoreClient
 from cloghandler import ConcurrentRotatingFileHandler
 
 _log = logging.getLogger(__name__)
@@ -78,6 +76,14 @@ class PolicyError(Exception):
 
 class PolicyAgent():
     def __init__(self):
+
+        if not self._in_k8s():
+            _log.debug("Project not running in kubernetes, possibly due to misuse, check README.md!!! (%s)", self._in_k8s())
+
+        from pycalico.datastore_datatypes import Rules, Rule, GlobalPolicy
+        from pycalico.datastore_errors import (ProfileNotInEndpoint, ProfileAlreadyInEndpoint,MultipleEndpointsMatch)
+        from pycalico.datastore import DatastoreClient
+
         self._event_queue = Queue.Queue()
         """
         Queue to populate with events from API watches.
@@ -120,7 +126,14 @@ class PolicyAgent():
         """
         Handlers for watch events.
         """
-        
+
+    @staticmethod
+    def _in_k8s():
+        '''
+        Check whether we are in k8s, return True/False
+        '''
+        return os.path.isdir(os.path.basename(os.path.basename(CA_CERT_PATH)))
+
     def add_handler(self, resource_type, event_type, handler):
         """
         Adds an event handler for the given event type (ADD, DELETE) for the 
@@ -627,7 +640,7 @@ def configure_etc_hosts():
 if __name__ == '__main__':
     # Configure logging.
     log_file = "/var/log/calico/kubernetes/policy/agent.log"
-    log_level = os.environ.get("LOG_LEVEL", "info").upper()
+    log_level = os.environ.get("LOG_LEVEL", "error").upper()
     if not os.path.exists(os.path.dirname(log_file)):
         os.makedirs(os.path.dirname(log_file))
     formatter = logging.Formatter(LOG_FORMAT)
